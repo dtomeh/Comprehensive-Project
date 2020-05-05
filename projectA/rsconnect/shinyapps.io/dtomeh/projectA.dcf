@@ -1,0 +1,12 @@
+name: projectA
+title: projectA
+username:
+account: dtomeh
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2245712
+bundleId: 3106701
+url: https://dtomeh.shinyapps.io/projectA/
+when: 1588694264.0726
+asMultiple: FALSE
+asStatic: FALSE
