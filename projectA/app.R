@@ -218,7 +218,7 @@ server <- function(input, output) {
     
     output$topwords <- renderPlot({
         top20 %>%
-            ggplot(aes(x=Token, y=n)) + 
+            ggplot(aes(x=reorder(Token, n), y=n)) + 
             geom_bar(stat="identity", fill="light blue") +
             geom_text(aes(label=n), hjust=1) +
             coord_flip() +
@@ -228,5 +228,5 @@ server <- function(input, output) {
 # Run the application 
 shinyApp(ui = ui, server = server)
 
-#URL to live App
-#https://dtomeh.shinyapps.io/projectA/?_ga=2.176046626.1026577531.1588695748-2138993899.1588695748
+#Url to app 
+#https://dtomeh.shinyapps.io/projectA/?_ga=2.243633157.1026577531.1588695748-2138993899.1588695748
