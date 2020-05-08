@@ -25,6 +25,8 @@ library(tidyverse)
 library(caret)
 library(glmnet)
 library(imputeMissings)
+library(ggplot2)
+
 ```
 
 # Data Import and Cleaning 
@@ -78,12 +80,10 @@ We can use this to see the coefficients of the final model with the best tuning 
 ```{r}
 coef(elastic_mod$finalModel, elastic_mod$finalModel$lambdaOpt)
 ```
-#Visualization
+# Visualization
 
 *This is the plot of the Unethical DEcision making scores predicted by the model in the houldout sample vs the actual values on the Unethical Decision Making Score. This helps visualize the relationship and the correlation between the two. 
 ```{r}
-library(ggplot2)
-
 ggplot(holdout, aes(holdout$UnethicalDecisionMaking, elastic_pred))+ 
   geom_smooth(method = "lm", col = "#c41200") +
   geom_point()
