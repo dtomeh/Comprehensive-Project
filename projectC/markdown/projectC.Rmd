@@ -1,0 +1,93 @@
+---
+title: "projectC"
+author: "Dana Tomeh"
+date: "5/5/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The data set I have chosen is actually one from an external project that I worked on with Paul for HumRRO last year. At the time, I thought that their stepwise selection process to pick variables to attempt to predict their relationships wasn't the best method. After diving deeper into machine learning this semester, I actually think that could prove to be a good technique to to use here. 
+The data set is confidential technically, so I'm going to omit it from the github upload. 
+The dataset contains 1250 observations of 64 (59 plus race which is dummy coded across 5) variables. There are only 298 complete cases, so I will use median imputation in the machine learning model. The variables are all psychological and include things like demographics, big 5, dark triad, binge drinking scales, and the ASVAB among other scales. The data comes from a working environment that has a large issue with unethical behaviors. The goal here is to use the collected variables to predict a score for the likelihood of participating in unethical behaviors in this very large workplace. Then a percentage of those with the highest likelihood can be screened out, which in similar situations has shown a disproportionately large reduction in unethical behaviors. 
+All of the variables collected have been shown to be related to predicting specific unethical behaviors. However, the relevant literature is pretty sparse, and there is very little replication done that will allow a better theoretical understanding of which variables may be more important predictors. 
+Since we are trying to predict unethical behaviors so that we can screen people out based on them, I think that machine learning is a good choice for this data set. It also might not be practical to use all 59 scales during selection, since that seriously increases the amount of time participants spend doing assessments. Some forms of machine learning (LASSO and Elastic Net regression) allow us to determine if we can use a sparser model. This may allow us to cut down on assessment time during the selection process. 
+I think using the elastic net regression is applicable here for many reasons. 1. Our sample size is large enough while still being less than 100k, 2. We're trying to predict a level of our outcome variable so that we can screen out a small proportion of those with the top percentile of scores, and 3. We're trying to minimize the number of important features. 
+Also, if we do run an Elastic Net regression, then the code will give us the best lambda and alpha values. If we get an alpha that is 1 we'll know we should have done LASSO instead. 
+
+# Libraries
+
+```{r, message=FALSE}
+library(readxl)
+library(tidyverse)
+library(caret)
+library(glmnet)
+library(imputeMissings)
+```
+
+# Data Import and Cleaning 
+```{r}
+dataset <- read_excel("../data/UnethicalDecMaking.xlsx")
+data <- dataset %>%
+  mutate_all(as.numeric) %>%
+  impute(object = NULL, "median/mode") 
+```
+
+# Analysis 
+
+*Step 1 is creating the hold out sample to see if the model we create predicts well or not. 
+```{r}
+set.seed(2020)
+rows <- sample(nrow(data))
+shuffled <- data[rows,]
+holdout <- shuffled[1:250,]
+mod_dat <- shuffled[(nrow(holdout)+1):nrow(shuffled),]
+```
+
+* Step 2 is to do the actual Elastic Net 
+This model runs pretty quickly so there really is no benefit to parallelizing 
+```{r}
+elastic_mod <- train(
+ UnethicalDecisionMaking ~ ., 
+ mod_dat, 
+ method="glmnet",
+ preProcess=c("center", "scale", "zv", "medianImpute"), 
+ trControl= trainControl(method="cv", number = 10, verboseIter = T), 
+ na.action = na.pass
+)
+
+#testing the model on the holdout data 
+elastic_pred <-predict(elastic_mod, holdout, na.action=na.pass)
+
+#testing the correlation between the elastic model predictions and the actual outcome variables 
+cor.test(elastic_pred, holdout$UnethicalDecisionMaking)
+```
+The correlation between the actual values of unethical behavior and the values of unethical behavior predicted by the present model are `r cor.test(elastic_pred, holdout$UnethicalDecisionMaking)$estimate` and the p value is `r cor.test(elastic_pred, holdout$UnethicalDecisionMaking)$pvalue`. This correlation is moderate. 
+
+The best tune for this model is `r elastic_mod$bestTune` which indicates that the alpha parameter is .1 which means the model is not purely LASSO or ridge regression. 
+The RMSE is 0.3816488 and the the MAE is 0.2679085 Smaller RMSE and MAE values are preferred. The RMSE and MAE are both higher than is ideal.
+The Rsquared is 0.3778922 Larger RSquared values are preferred. This means that the model only accounts for 38% of the variance in unethical behaviors. 
+
+```{r}
+elastic_mod$results
+```
+
+We can use this to see the coefficients of the final model with the best tuning parameters. It will also show us whether any of the predictors were dropped by the machine learning. 22 predictors were dropped, leaving us with 41 variables. This elastic net model has helped to make the model more sparse.   
+```{r}
+coef(elastic_mod$finalModel, elastic_mod$finalModel$lambdaOpt)
+```
+#Visualization
+
+*This is the plot of the Unethical DEcision making scores predicted by the model in the houldout sample vs the actual values on the Unethical Decision Making Score. This helps visualize the relationship and the correlation between the two. 
+```{r}
+library(ggplot2)
+
+ggplot(holdout, aes(holdout$UnethicalDecisionMaking, elastic_pred))+ 
+  geom_smooth(method = "lm", col = "#c41200") +
+  geom_point()
+```
+
+The goal was to see whether we could predict individuals' level of unethical behavior from scales that have been linked to specific types of unethical behavior in the past. The model created predicts values for unethical behavior that are only correlated `r cor.test(elastic_pred, holdout$UnethicalDecisionMaking)$estimate` with the actual values for unethical behavior. This is a moderate correlation, but is not as high as we might like in a predictive model being used to screen people out in selection. The Rsquared is low acceptable (.38) which means that only 38% of the variance in unethical decision making can be explained by our model, which is not ideal for a selection setting. Also, the RMSE and MAE are low but could be lower. 
+The model did drop several of the predictors, which was the hope. Since it is easier to administer fewer measures in a selection setting. However, this drop was not accompanied with a strong model. So therefore, while this is a fair model, I think a stronger one could be found using different variables. A past behavior scale might actually be helpful in this situation.  
